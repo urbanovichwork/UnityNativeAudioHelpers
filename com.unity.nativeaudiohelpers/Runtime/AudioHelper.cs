@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 
 namespace NativeAudioHelper
@@ -6,19 +7,15 @@ namespace NativeAudioHelper
     [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature)]
     public class AudioHelper : IAudioHelper, IDisposable
     {
-        private readonly IAudioHelper nativeAudioHelper;
+        private readonly IAudioHelper _nativeAudioHelper;
 
-        public AudioHelper() => nativeAudioHelper = CreateAudioHelperImplementation();
-
-        public void Dispose() => nativeAudioHelper.Dispose();
-
-        public bool IsHeadphonesConnected() => nativeAudioHelper.IsHeadphonesConnected();
-
-        public float GetDeviceVolume() => nativeAudioHelper.GetDeviceVolume();
-
-        public void SetDeviceVolume(float delta) => nativeAudioHelper.SetDeviceVolume(delta);
-
-        public float GetDeviceMaxVolume() => nativeAudioHelper.GetDeviceMaxVolume();
+        public AudioHelper() => _nativeAudioHelper = CreateAudioHelperImplementation();
+        public void Dispose() => _nativeAudioHelper.Dispose();
+        public bool IsHeadphonesConnected() => _nativeAudioHelper.IsHeadphonesConnected();
+        public Task<bool> IsDeviceMuted() => _nativeAudioHelper.IsDeviceMuted();
+        public float GetDeviceVolume() => _nativeAudioHelper.GetDeviceVolume();
+        public void SetDeviceVolume(float delta) => _nativeAudioHelper.SetDeviceVolume(delta);
+        public float GetDeviceMaxVolume() => _nativeAudioHelper.GetDeviceMaxVolume();
 
         private IAudioHelper CreateAudioHelperImplementation()
         {
