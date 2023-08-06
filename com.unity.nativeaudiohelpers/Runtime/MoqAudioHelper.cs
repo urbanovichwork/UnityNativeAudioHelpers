@@ -1,4 +1,4 @@
-﻿using System;
+﻿using System.Threading.Tasks;
 using JetBrains.Annotations;
 
 namespace NativeAudioHelper
@@ -6,8 +6,8 @@ namespace NativeAudioHelper
     [UsedImplicitly(ImplicitUseKindFlags.InstantiatedNoFixedConstructorSignature)]
     internal class MoqAudioHelper : IAudioHelper
     {
-        private readonly float maxVolume = 1f;
-        private float volume = 0.75f;
+        private const float MaxVolume = 1f;
+        private float _volume = 0.75f;
 
         public void Dispose()
         {
@@ -18,19 +18,24 @@ namespace NativeAudioHelper
             return true;
         }
 
+        public Task<bool> IsDeviceMuted()
+        {
+            return Task.FromResult(false);
+        }
+
         public float GetDeviceVolume()
         {
-            return volume;
+            return _volume;
         }
 
         public void SetDeviceVolume(float delta)
         {
-            volume = delta;
+            _volume = delta;
         }
 
         public float GetDeviceMaxVolume()
         {
-            return maxVolume;
+            return MaxVolume;
         }
     }
 }

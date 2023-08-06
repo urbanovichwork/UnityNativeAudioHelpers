@@ -1,7 +1,33 @@
 #import <AVFoundation/AVFoundation.h>
 #import <MediaPlayer/MPVolumeView.h>
+#import <AudioToolbox/AudioToolbox.h>
 
 extern "C" {
+	static CFTimeInterval startPlayTime;
+	string cachedClipName;
+	SystemSoundID cachedSoundFileID;
+	typedef void (*IsMutedCallbackType)(bool state);
+	IsMutedCallbackType callback;
+
+	void _InitIsMutedCheck(string clipName, IsMutedCallbackType callback) {
+		if (clipName != cachedClipName){
+			cachedClipName = clipName;
+			NSString* bundlePath = [[NSBundle mainBundle] bundlePath];
+			NSString* streamingAssetsPath = [NSString stringWithFormat:@"%@/Data/Raw/", bundlePath];
+			NSURL* url = [NSURL URLWithString:[NSString stringWithFormat:@"%@/%@", streamingAssetsPath, cachedClipName]];
+			AudioServicesCreateSystemSoundID((__bridge CFURLRef)url, &cachedSoundFileID);
+		}
+    	startPlayTime = CACurrentMediaTime();
+		AudioServicesAddSystemSoundCompletion(cachedSoundFileID, NULL, NULL, PlaySoundCompletionBlock, (__bridge void *)self);
+		AudioServicesPlaySystemSound(cachedSoundFileID);
+	}
+	
+	static void PlaySoundCompletionBlock(SystemSoundID SSID, void *clientData) {
+		AudioServicesRemoveSystemSoundCompletion(SSID);
+		CFTimeInterval playTime = CACurrentMediaTime() - startPlayTime;
+		callback(playTime < 0.1);
+	}
+
 	bool _IsHeadphonesOn() {
         AVAudioSessionRouteDescription* route = [[AVAudioSession sharedInstance] currentRoute];
         
@@ -16,7 +42,7 @@ extern "C" {
         
         return false;
 	}
-	
+
 	float _GetSystemVolume() {
 	    float volume = [[AVAudioSession sharedInstance] outputVolume];
 	    return volume;

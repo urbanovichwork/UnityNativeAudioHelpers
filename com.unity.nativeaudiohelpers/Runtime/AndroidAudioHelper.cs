@@ -1,4 +1,5 @@
 ﻿#if UNITY_ANDROID
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 using UnityEngine;
 
@@ -16,26 +17,28 @@ namespace NativeAudioHelper
         private const string SetSystemVolumeMethodName = "_SetSystemVolume";
         private const string GetDeviceMaxVolumeMethodName = "_GetDeviceMaxVolume";
 
-        private AndroidJavaObject androidPlugin;
+        private AndroidJavaObject _androidPlugin;
 
         public AndroidAudioHelper() => InitializePlugin();
-
-        public void Dispose() => androidPlugin.Dispose();
-
-        public bool IsHeadphonesConnected() => androidPlugin.Call<bool>(IsHeadphonesOnMethodName);
-
-        public float GetDeviceVolume() => androidPlugin.Call<float>(GetSystemVolumeMethodName);
-
-        public void SetDeviceVolume(float volume) => androidPlugin.Call(SetSystemVolumeMethodName, volume);
-
-        public float GetDeviceMaxVolume() =>androidPlugin.Call<float>(GetDeviceMaxVolumeMethodName);
 
         private void InitializePlugin()
         {
             using var javaUnityPlayer = new AndroidJavaClass(UnityPlayerClassName);
             using var currentActivity = javaUnityPlayer.GetStatic<AndroidJavaObject>(CurrentActivityName);
-            androidPlugin = new AndroidJavaObject(PluginNamespace, currentActivity);
+            _androidPlugin = new AndroidJavaObject(PluginNamespace, currentActivity);
         }
+
+        public void Dispose() => _androidPlugin.Dispose();
+
+        public bool IsHeadphonesConnected() => _androidPlugin.Call<bool>(IsHeadphonesOnMethodName);
+
+        public Task<bool> IsDeviceMuted() => Task.FromResult(false);
+
+        public float GetDeviceVolume() => _androidPlugin.Call<float>(GetSystemVolumeMethodName);
+
+        public void SetDeviceVolume(float volume) => _androidPlugin.Call(SetSystemVolumeMethodName, volume);
+
+        public float GetDeviceMaxVolume() => _androidPlugin.Call<float>(GetDeviceMaxVolumeMethodName);
     }
 }
 #endif
