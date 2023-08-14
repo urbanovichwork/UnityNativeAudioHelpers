@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
+using UnityEngine.Scripting;
 
 namespace NativeAudioHelper
 {
@@ -8,7 +9,7 @@ namespace NativeAudioHelper
     public class AudioHelper : IAudioHelper, IDisposable
     {
         private readonly IAudioHelper _nativeAudioHelper;
-
+        [Preserve]
         public AudioHelper() => _nativeAudioHelper = CreateAudioHelperImplementation();
         public void Dispose() => _nativeAudioHelper.Dispose();
         public bool IsHeadphonesConnected() => _nativeAudioHelper.IsHeadphonesConnected();
