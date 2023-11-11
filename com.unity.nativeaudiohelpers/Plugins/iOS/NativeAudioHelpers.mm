@@ -15,7 +15,16 @@ extern "C" {
 		callback(playTime < 0.1);
 	}
 
-	void _InitIsMutedCheck(NSString* clipName, IsMutedCallbackType callback) {
+	static NSString* CreateNSString(const char* string)
+    {
+        if (string != NULL)
+            return [NSString stringWithUTF8String:string];
+        else
+            return [NSString stringWithUTF8String:""];
+    }
+
+ 	void _InitIsMutedCheck(const char* clipNameRaw, IsMutedCallbackType callbackRaw) {
+        NSString* clipName = CreateNSString(clipNameRaw);
 		if (clipName != cachedClipName){
 			cachedClipName = clipName;
 			NSString* bundlePath = [[NSBundle mainBundle] bundlePath];
@@ -23,6 +32,7 @@ extern "C" {
 			NSURL* url = [NSURL URLWithString:[NSString stringWithFormat:@"%@/%@", streamingAssetsPath, cachedClipName]];
 			AudioServicesCreateSystemSoundID((__bridge CFURLRef)url, &cachedSoundFileID);
 		}
+		callback = callbackRaw;
     	startPlayTime = CACurrentMediaTime();
 		AudioServicesAddSystemSoundCompletion(cachedSoundFileID, NULL, NULL, PlaySoundCompletionBlock, NULL);
 		AudioServicesPlaySystemSound(cachedSoundFileID);
