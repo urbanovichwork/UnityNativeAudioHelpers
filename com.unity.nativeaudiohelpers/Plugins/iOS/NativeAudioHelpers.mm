@@ -4,12 +4,18 @@
 
 extern "C" {
 	static CFTimeInterval startPlayTime;
-	string cachedClipName;
+	NSString* cachedClipName;
 	SystemSoundID cachedSoundFileID;
 	typedef void (*IsMutedCallbackType)(bool state);
 	IsMutedCallbackType callback;
 
-	void _InitIsMutedCheck(string clipName, IsMutedCallbackType callback) {
+	static void PlaySoundCompletionBlock(SystemSoundID SSID, void *clientData) {
+		AudioServicesRemoveSystemSoundCompletion(SSID);
+		CFTimeInterval playTime = CACurrentMediaTime() - startPlayTime;
+		callback(playTime < 0.1);
+	}
+
+	void _InitIsMutedCheck(NSString* clipName, IsMutedCallbackType callback) {
 		if (clipName != cachedClipName){
 			cachedClipName = clipName;
 			NSString* bundlePath = [[NSBundle mainBundle] bundlePath];
@@ -18,14 +24,8 @@ extern "C" {
 			AudioServicesCreateSystemSoundID((__bridge CFURLRef)url, &cachedSoundFileID);
 		}
     	startPlayTime = CACurrentMediaTime();
-		AudioServicesAddSystemSoundCompletion(cachedSoundFileID, NULL, NULL, PlaySoundCompletionBlock, (__bridge void *)self);
+		AudioServicesAddSystemSoundCompletion(cachedSoundFileID, NULL, NULL, PlaySoundCompletionBlock, NULL);
 		AudioServicesPlaySystemSound(cachedSoundFileID);
-	}
-	
-	static void PlaySoundCompletionBlock(SystemSoundID SSID, void *clientData) {
-		AudioServicesRemoveSystemSoundCompletion(SSID);
-		CFTimeInterval playTime = CACurrentMediaTime() - startPlayTime;
-		callback(playTime < 0.1);
 	}
 
 	bool _IsHeadphonesOn() {
