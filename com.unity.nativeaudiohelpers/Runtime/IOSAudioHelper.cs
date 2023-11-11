@@ -51,6 +51,7 @@ namespace NativeAudioHelper
         static void IsMutedCallback(bool isMuted)
         {
             _taskCompletionSource.SetResult(isMuted);
+            _taskCompletionSource = null;
         }
 
         public float GetDeviceVolume() => _GetSystemVolume();
