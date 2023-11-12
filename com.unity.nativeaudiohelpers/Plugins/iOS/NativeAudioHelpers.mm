@@ -1,6 +1,8 @@
 #import <AVFoundation/AVFoundation.h>
-#import <MediaPlayer/MPVolumeView.h>
 #import <AudioToolbox/AudioToolbox.h>
+#import <MediaPlayer/MPVolumeView.h>
+#import <MediaPlayer/MediaPlayer.h>
+#import <UIKit/UIKit.h>
 
 extern "C" {
 	static CFTimeInterval startPlayTime;
@@ -60,6 +62,21 @@ extern "C" {
 	
 	void _SetSystemVolume(float volume)
 	{
+		MPVolumeView *volumeView = [[MPVolumeView alloc] init];
+		UISlider *volumeSlider = nil;
+		
+		for( UIView *view in [volumeView subviews] )
+		{
+			if( [NSStringFromClass(view.class) isEqualToString:@"MPVolumeSlider"] )
+			{
+				volumeSlider = (UISlider *)view;
+				break;
+			}
+		}
+		
+		dispatch_after( dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.01 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+			volumeSlider.value = volume;
+		});
 	// 	MPVolumeView *volumeView = [[MPVolumeView alloc] init];
 	// 	UISlider *volumeViewSlider = nil;
 		
