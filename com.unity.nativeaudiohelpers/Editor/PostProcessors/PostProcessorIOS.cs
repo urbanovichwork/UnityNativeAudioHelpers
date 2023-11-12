@@ -1,4 +1,5 @@
-﻿using UnityEditor;
+﻿#if UNITY_IOS
+using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.iOS.Xcode;
@@ -44,3 +45,4 @@ namespace NativeAudioHelper.Editor
         }
     }
 }
+#endif
