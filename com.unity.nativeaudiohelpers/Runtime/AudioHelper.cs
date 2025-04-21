@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using UnityEngine.Scripting;
@@ -9,11 +10,16 @@ namespace NativeAudioHelper
     public class AudioHelper : IAudioHelper, IDisposable
     {
         private readonly IAudioHelper _nativeAudioHelper;
+
         [Preserve]
         public AudioHelper() => _nativeAudioHelper = CreateAudioHelperImplementation();
+
         public void Dispose() => _nativeAudioHelper.Dispose();
         public bool IsHeadphonesConnected() => _nativeAudioHelper.IsHeadphonesConnected();
-        public Task<bool> IsDeviceMuted() => _nativeAudioHelper.IsDeviceMuted();
+
+        public Task<bool> IsDeviceMuted(CancellationToken cancellationToken) =>
+            _nativeAudioHelper.IsDeviceMuted(cancellationToken);
+
         public float GetDeviceVolume() => _nativeAudioHelper.GetDeviceVolume();
         public void SetDeviceVolume(float delta) => _nativeAudioHelper.SetDeviceVolume(delta);
         public float GetDeviceMaxVolume() => _nativeAudioHelper.GetDeviceMaxVolume();

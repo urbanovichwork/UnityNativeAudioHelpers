@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Threading;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
 
 namespace NativeAudioHelper
@@ -18,7 +19,7 @@ namespace NativeAudioHelper
             return true;
         }
 
-        public Task<bool> IsDeviceMuted()
+        public Task<bool> IsDeviceMuted(CancellationToken cancellationToken)
         {
             return Task.FromResult(false);
         }

@@ -1,5 +1,6 @@
 ﻿#if UNITY_IOS
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 
@@ -9,7 +10,7 @@ namespace NativeAudioHelper
     internal class IOSAudioHelper : IAudioHelper
     {
         private const string ClipName = "NativeAudioHelpers_Mute.caf";
-        
+
         [DllImport("__Internal")]
         private static extern bool _IsHeadphonesOn();
 
@@ -35,15 +36,15 @@ namespace NativeAudioHelper
 
         public bool IsHeadphonesConnected() => _IsHeadphonesOn();
 
-        public async Task<bool> IsDeviceMuted()
+        public async Task<bool> IsDeviceMuted(CancellationToken cancellationToken)
         {
             if (_taskCompletionSource == null)
             {
                 _taskCompletionSource = new TaskCompletionSource<bool>();
                 _InitIsMutedCheck(ClipName, IsMutedCallback);
-                await _taskCompletionSource.Task;
             }
 
+            using var registration = cancellationToken.Register(() => _taskCompletionSource.TrySetCanceled());
             return await _taskCompletionSource.Task;
         }
 
