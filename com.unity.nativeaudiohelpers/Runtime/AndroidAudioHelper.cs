@@ -1,4 +1,5 @@
 ﻿#if UNITY_ANDROID
+using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using UnityEngine;
@@ -32,7 +33,7 @@ namespace NativeAudioHelper
 
         public bool IsHeadphonesConnected() => _androidPlugin.Call<bool>(IsHeadphonesOnMethodName);
 
-        public Task<bool> IsDeviceMuted() => Task.FromResult(false);
+        public Task<bool> IsDeviceMuted(CancellationToken cancellationToken) => Task.FromResult(false);
 
         public float GetDeviceVolume() => _androidPlugin.Call<float>(GetSystemVolumeMethodName);
 
