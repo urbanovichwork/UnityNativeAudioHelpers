@@ -10,14 +10,16 @@ namespace NativeAudioHelper
     internal class IOSAudioHelper : IAudioHelper
     {
         private const string ClipName = "NativeAudioHelpers_Mute.caf";
+        private static readonly object Lock = new();
+        private static TaskCompletionSource<bool> _tcs;
+
+        private delegate void IsMutedCallbackType(bool isMuted);
 
         [DllImport("__Internal")]
         private static extern bool _IsHeadphonesOn();
 
         [DllImport("__Internal")]
         private static extern void _InitIsMutedCheck(string clipName, IsMutedCallbackType callback);
-
-        delegate void IsMutedCallbackType(bool isMuted);
 
         [DllImport("__Internal")]
         private static extern float _GetSystemVolume();
@@ -28,8 +30,6 @@ namespace NativeAudioHelper
         [DllImport("__Internal")]
         private static extern float _GetDeviceMaxVolume();
 
-        private static TaskCompletionSource<bool> _taskCompletionSource;
-
         public void Dispose()
         {
         }
@@ -38,21 +38,37 @@ namespace NativeAudioHelper
 
         public async Task<bool> IsDeviceMuted(CancellationToken cancellationToken)
         {
-            if (_taskCompletionSource == null)
+            TaskCompletionSource<bool> localTcs;
+            bool isNew;
+            lock (Lock)
             {
-                _taskCompletionSource = new TaskCompletionSource<bool>();
-                _InitIsMutedCheck(ClipName, IsMutedCallback);
+                isNew = _tcs == null;
+                localTcs = _tcs ??= new TaskCompletionSource<bool>();
             }
 
-            using var registration = cancellationToken.Register(() => _taskCompletionSource.TrySetCanceled());
-            return await _taskCompletionSource.Task;
+            using var reg = cancellationToken.Register(() =>
+            {
+                lock (Lock)
+                {
+                    localTcs.TrySetCanceled();
+                    if (_tcs == localTcs) _tcs = null;
+                }
+            });
+
+            if (isNew)
+                _InitIsMutedCheck(ClipName, IsMutedCallback);
+
+            return await localTcs.Task;
         }
 
         [AOT.MonoPInvokeCallback(typeof(IsMutedCallbackType))]
-        static void IsMutedCallback(bool isMuted)
+        private static void IsMutedCallback(bool isMuted)
         {
-            _taskCompletionSource.SetResult(isMuted);
-            _taskCompletionSource = null;
+            lock (Lock)
+            {
+                _tcs?.TrySetResult(isMuted);
+                _tcs = null;
+            }
         }
 
         public float GetDeviceVolume() => _GetSystemVolume();

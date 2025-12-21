@@ -6,38 +6,63 @@
 
 extern "C" {
 	static CFTimeInterval startPlayTime;
-	NSString* cachedClipName;
-	SystemSoundID cachedSoundFileID;
+	static NSString* cachedClipName;
+	static SystemSoundID cachedSoundFileID = 0;
 	typedef void (*IsMutedCallbackType)(bool state);
-	IsMutedCallbackType callback;
+	static IsMutedCallbackType currentCallback = NULL;
+	static BOOL callbackFired = NO;
+
+	static void FireCallback(bool isMuted) {
+		if (!callbackFired && currentCallback) {
+			callbackFired = YES;
+			IsMutedCallbackType cb = currentCallback;
+			currentCallback = NULL;
+			cb(isMuted);
+		}
+	}
 
 	static void PlaySoundCompletionBlock(SystemSoundID SSID, void *clientData) {
 		AudioServicesRemoveSystemSoundCompletion(SSID);
 		CFTimeInterval playTime = CACurrentMediaTime() - startPlayTime;
-		callback(playTime < 0.1);
+		FireCallback(playTime < 0.1);
 	}
 
-	static NSString* CreateNSString(const char* string)
-    {
-        if (string != NULL)
-            return [NSString stringWithUTF8String:string];
-        else
-            return [NSString stringWithUTF8String:""];
-    }
+	void _InitIsMutedCheck(const char* clipNameRaw, IsMutedCallbackType callbackRaw) {
+		if (!callbackRaw) return;
 
- 	void _InitIsMutedCheck(const char* clipNameRaw, IsMutedCallbackType callbackRaw) {
-        NSString* clipName = CreateNSString(clipNameRaw);
-		if (clipName != cachedClipName){
+		currentCallback = callbackRaw;
+		callbackFired = NO;
+
+		NSString* clipName = clipNameRaw ? [NSString stringWithUTF8String:clipNameRaw] : @"";
+
+		if (![clipName isEqualToString:cachedClipName]) {
+			if (cachedSoundFileID != 0) {
+				AudioServicesDisposeSystemSoundID(cachedSoundFileID);
+				cachedSoundFileID = 0;
+			}
 			cachedClipName = clipName;
 			NSString* bundlePath = [[NSBundle mainBundle] bundlePath];
-			NSString* streamingAssetsPath = [NSString stringWithFormat:@"%@/Data/Raw/", bundlePath];
-			NSURL* url = [NSURL URLWithString:[NSString stringWithFormat:@"%@/%@", streamingAssetsPath, cachedClipName]];
-			AudioServicesCreateSystemSoundID((__bridge CFURLRef)url, &cachedSoundFileID);
+			NSString* path = [NSString stringWithFormat:@"%@/Data/Raw/%@", bundlePath, cachedClipName];
+			NSURL* url = [NSURL fileURLWithPath:path];
+			OSStatus status = AudioServicesCreateSystemSoundID((__bridge CFURLRef)url, &cachedSoundFileID);
+			if (status != kAudioServicesNoError) {
+				cachedSoundFileID = 0;
+			}
 		}
-		callback = callbackRaw;
-    	startPlayTime = CACurrentMediaTime();
+
+		if (cachedSoundFileID == 0) {
+			FireCallback(false);
+			return;
+		}
+
+		startPlayTime = CACurrentMediaTime();
 		AudioServicesAddSystemSoundCompletion(cachedSoundFileID, NULL, NULL, PlaySoundCompletionBlock, NULL);
 		AudioServicesPlaySystemSound(cachedSoundFileID);
+
+		// Timeout fallback - if callback doesn't fire within 1s, assume not muted
+		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+			FireCallback(false);
+		});
 	}
 
 	bool _IsHeadphonesOn() {
@@ -60,40 +85,21 @@ extern "C" {
 	    return volume;
 	}
 	
-	void _SetSystemVolume(float volume)
-	{
+	void _SetSystemVolume(float volume) {
 		MPVolumeView *volumeView = [[MPVolumeView alloc] init];
 		UISlider *volumeSlider = nil;
-		
-		for( UIView *view in [volumeView subviews] )
-		{
-			if( [NSStringFromClass(view.class) isEqualToString:@"MPVolumeSlider"] )
-			{
+		for (UIView *view in [volumeView subviews]) {
+			if ([NSStringFromClass(view.class) isEqualToString:@"MPVolumeSlider"]) {
 				volumeSlider = (UISlider *)view;
 				break;
 			}
 		}
-		
-		dispatch_after( dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.01 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+		dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.01 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
 			volumeSlider.value = volume;
 		});
-	// 	MPVolumeView *volumeView = [[MPVolumeView alloc] init];
-	// 	UISlider *volumeViewSlider = nil;
-		
-	// 	for (UIView *view in volumeView.subviews) {
-	// 		if ([view isKindOfClass:[UISlider class]]) {
-	// 			volumeViewSlider = (UISlider *)view;
-	// 			break;
-	// 		}
-	// 	}
-		
-	// 	dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.0001 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-	// 		volumeViewSlider.value = _vol;
-	// 	});
-    }
-    
-    float _GetDeviceMaxVolume()
-    {
-        return 1;
-    }
+	}
+
+	float _GetDeviceMaxVolume() {
+		return 1;
+	}
 }
