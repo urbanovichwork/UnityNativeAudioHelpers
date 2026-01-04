@@ -17,6 +17,8 @@ namespace NativeAudioHelper
         private const string GetSystemVolumeMethodName = "_GetSystemVolume";
         private const string SetSystemVolumeMethodName = "_SetSystemVolume";
         private const string GetDeviceMaxVolumeMethodName = "_GetDeviceMaxVolume";
+        private const string GetAudioOutputTypeMethodName = "_GetAudioOutputType";
+        private const string GetAudioOutputNameMethodName = "_GetAudioOutputName";
 
         private AndroidJavaObject _androidPlugin;
 
@@ -40,6 +42,14 @@ namespace NativeAudioHelper
         public void SetDeviceVolume(float volume) => _androidPlugin.Call(SetSystemVolumeMethodName, volume);
 
         public float GetDeviceMaxVolume() => _androidPlugin.Call<float>(GetDeviceMaxVolumeMethodName);
+
+        public AudioOutputInfo GetAudioOutputInfo()
+        {
+            string portType = _androidPlugin.Call<string>(GetAudioOutputTypeMethodName);
+            string portName = _androidPlugin.Call<string>(GetAudioOutputNameMethodName);
+            bool isHeadphones = IsHeadphonesConnected();
+            return new AudioOutputInfo(portType, portName, isHeadphones);
+        }
     }
 }
 #endif

@@ -23,6 +23,7 @@ namespace NativeAudioHelper
         public float GetDeviceVolume() => _nativeAudioHelper.GetDeviceVolume();
         public void SetDeviceVolume(float delta) => _nativeAudioHelper.SetDeviceVolume(delta);
         public float GetDeviceMaxVolume() => _nativeAudioHelper.GetDeviceMaxVolume();
+        public AudioOutputInfo GetAudioOutputInfo() => _nativeAudioHelper.GetAudioOutputInfo();
 
         private IAudioHelper CreateAudioHelperImplementation()
         {

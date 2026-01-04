@@ -102,4 +102,30 @@ extern "C" {
 	float _GetDeviceMaxVolume() {
 		return 1;
 	}
+
+	const char* _GetAudioOutputType() {
+		AVAudioSessionRouteDescription* route = [[AVAudioSession sharedInstance] currentRoute];
+		AVAudioSessionPortDescription* output = [[route outputs] firstObject];
+		if (output) {
+			NSString* portType = [output portType];
+			const char* cStr = [portType UTF8String];
+			char* result = (char*)malloc(strlen(cStr) + 1);
+			strcpy(result, cStr);
+			return result;
+		}
+		return strdup("unknown");
+	}
+
+	const char* _GetAudioOutputName() {
+		AVAudioSessionRouteDescription* route = [[AVAudioSession sharedInstance] currentRoute];
+		AVAudioSessionPortDescription* output = [[route outputs] firstObject];
+		if (output) {
+			NSString* portName = [output portName];
+			const char* cStr = [portName UTF8String];
+			char* result = (char*)malloc(strlen(cStr) + 1);
+			strcpy(result, cStr);
+			return result;
+		}
+		return strdup("");
+	}
 }

@@ -38,5 +38,10 @@ namespace NativeAudioHelper
         {
             return MaxVolume;
         }
+
+        public AudioOutputInfo GetAudioOutputInfo()
+        {
+            return new AudioOutputInfo("headphones", "Mock Headphones", true);
+        }
     }
 }

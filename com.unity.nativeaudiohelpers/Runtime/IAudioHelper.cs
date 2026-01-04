@@ -10,6 +10,7 @@ namespace NativeAudioHelper
         public float GetDeviceVolume();
         public void SetDeviceVolume(float delta);
         public float GetDeviceMaxVolume();
+        public AudioOutputInfo GetAudioOutputInfo();
         public void Dispose();
     }
 }

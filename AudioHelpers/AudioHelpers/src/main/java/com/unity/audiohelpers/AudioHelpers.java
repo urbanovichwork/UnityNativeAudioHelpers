@@ -50,5 +50,52 @@ public class AudioHelpers
     {
         return audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
     }
+
+    public String _GetAudioOutputType()
+    {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M)
+        {
+            AudioDeviceInfo[] devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+            for (AudioDeviceInfo device : devices)
+            {
+                int type = device.getType();
+                if (type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP)
+                    return "bluetoothA2DP";
+                if (type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO)
+                    return "bluetoothSCO";
+                if (type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES)
+                    return "wiredHeadphones";
+                if (type == AudioDeviceInfo.TYPE_WIRED_HEADSET)
+                    return "wiredHeadset";
+                if (type == AudioDeviceInfo.TYPE_USB_HEADSET)
+                    return "usbHeadset";
+                if (type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER)
+                    return "builtInSpeaker";
+            }
+        }
+        return "unknown";
+    }
+
+    public String _GetAudioOutputName()
+    {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M)
+        {
+            AudioDeviceInfo[] devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS);
+            for (AudioDeviceInfo device : devices)
+            {
+                int type = device.getType();
+                if (type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                    type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                    type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                    type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                    type == AudioDeviceInfo.TYPE_USB_HEADSET)
+                {
+                    CharSequence name = device.getProductName();
+                    return name != null ? name.toString() : "";
+                }
+            }
+        }
+        return "";
+    }
 }
 

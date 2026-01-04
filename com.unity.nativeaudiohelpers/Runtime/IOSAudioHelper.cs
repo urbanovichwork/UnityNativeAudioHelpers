@@ -30,6 +30,12 @@ namespace NativeAudioHelper
         [DllImport("__Internal")]
         private static extern float _GetDeviceMaxVolume();
 
+        [DllImport("__Internal")]
+        private static extern string _GetAudioOutputType();
+
+        [DllImport("__Internal")]
+        private static extern string _GetAudioOutputName();
+
         public void Dispose()
         {
         }
@@ -74,6 +80,14 @@ namespace NativeAudioHelper
         public float GetDeviceVolume() => _GetSystemVolume();
         public void SetDeviceVolume(float volume) => _SetSystemVolume(volume);
         public float GetDeviceMaxVolume() => _GetDeviceMaxVolume();
+
+        public AudioOutputInfo GetAudioOutputInfo()
+        {
+            string portType = _GetAudioOutputType();
+            string portName = _GetAudioOutputName();
+            bool isHeadphones = IsHeadphonesConnected();
+            return new AudioOutputInfo(portType, portName, isHeadphones);
+        }
     }
 }
 #endif
