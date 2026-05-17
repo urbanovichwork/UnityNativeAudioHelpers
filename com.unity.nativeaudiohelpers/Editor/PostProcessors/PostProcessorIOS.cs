@@ -1,47 +1,38 @@
-﻿#if UNITY_IOS
+#if UNITY_IOS
 using UnityEditor;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using UnityEditor.iOS.Xcode;
-using UnityEngine;
 
 namespace NativeAudioHelper.Editor
 {
-    public class PostProcessorIOS : IPostprocessBuildWithReport
+    // Links MediaPlayer.framework on top of Unity's default frameworks. The native
+    // plugin uses MPVolumeView + MPVolumeSlider for programmatic system-volume
+    // changes; Unity does not auto-link MediaPlayer for non-audio projects.
+    public sealed class PostProcessorIOS : IPostprocessBuildWithReport
     {
         int IOrderedCallback.callbackOrder => 2;
 
         public void OnPostprocessBuild(BuildReport report)
         {
-            if (report.summary.platform == BuildTarget.iOS)
-            {
-                Log($"{nameof(OnPostprocessBuild)} Started");
-                WritePropertiesToProject(report.summary.outputPath);
-                Log($"{nameof(OnPostprocessBuild)} Finished");
-            }
-        }
+            if (report.summary.platform != BuildTarget.iOS) return;
 
-        private void WritePropertiesToProject(string path)
-        {
-            Log($"{nameof(WritePropertiesToProject)} {path}");
-            var projPath = PBXProject.GetPBXProjectPath(path);
+            string projPath = PBXProject.GetPBXProjectPath(report.summary.outputPath);
             var project = new PBXProject();
             project.ReadFromFile(projPath);
 
-            var targetGuid = project.GetUnityMainTargetGuid();
-
-            foreach (var framework in new[] { targetGuid, project.GetUnityFrameworkTargetGuid() })
+            string[] targets =
             {
-                Log($"Write to {framework}");
-                project.AddFrameworkToProject(framework, "MediaPlayer.framework", true);
+                project.GetUnityMainTargetGuid(),
+                project.GetUnityFrameworkTargetGuid()
+            };
+
+            foreach (string targetGuid in targets)
+            {
+                project.AddFrameworkToProject(targetGuid, "MediaPlayer.framework", false);
             }
 
             project.WriteToFile(projPath);
-        }
-
-        private static void Log(string message)
-        {
-            Debug.Log($"[PostProcessorIPhone]: {message}");
         }
     }
 }

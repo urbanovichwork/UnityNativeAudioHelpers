@@ -1,14 +1,33 @@
 UnityNativeAudioHelpers
-==================
+=======================
 
-UnityNativeAudioHelpers is a [Unity native plugin](http://docs.unity3d.com/Manual/NativePlugins.html) which has helper audio functions for iOS & Android.
+Native audio helpers for iOS and Android, surfaced as a single `IAudioHelper` interface
+to Unity:
 
-For Android, you need to add permissions:  
-`<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>`
-`<uses-permission android:name="android.permission.BLUETOOTH"/>`
+- `CurrentOutput` — type, name, channels, output latency of the active output route
+- `Volume` — normalised `[0, 1]` system media volume
+- `OnOutputChanged` / `OnVolumeChanged` — push-based observables (no polling)
+- `SetVolume(normalised, showSystemUi)` — Android only; throws on iOS
+- `SupportsProgrammaticVolume` — guard your UI against the iOS no-op
 
-**Useful references**
+### Layout
 
-[Create a JAR from Android Studio Project](https://stackoverflow.com/questions/21712714/how-to-make-a-jar-out-from-an-android-studio-project)
+- `com.unity.nativeaudiohelpers/` — UPM package (C# runtime, iOS `.mm`, prebuilt Android `.aar`)
+- `AudioHelpers/` — Android library source (Kotlin, Gradle). Build the AAR with:
+  ```bash
+  cd AudioHelpers && ./gradlew :AudioHelpers:assembleRelease
+  ```
+  Then copy `AudioHelpers/AudioHelpers/build/outputs/aar/AudioHelpers-release.aar` to
+  `com.unity.nativeaudiohelpers/Plugins/Android/AudioHelpers.aar`.
 
-[Create an android library project](https://www.vogella.com/tutorials/AndroidLibraryProjects/article.html)
+### Permissions (Android)
+
+- `MODIFY_AUDIO_SETTINGS` — required only if you call `SetVolume`.
+  Add to your Unity Android manifest if used:
+  `<uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>`
+- No Bluetooth permissions are required for route detection — `AudioManager.getDevices`
+  works without them on API 23+.
+
+### iOS
+
+`AVFoundation` is auto-linked by Unity. No post-processor is required.

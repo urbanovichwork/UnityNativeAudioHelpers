@@ -1,9 +1,9 @@
 {
   "name": "com.unity.nativeaudiohelpers",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "displayName": "Native Audio Helpers",
-  "description": "Native Audio Helpers",
-  "unity": "2021.3",
+  "description": "Push-based audio route + volume helpers for iOS and Android. Exposes IAudioHelper with observables for route/volume changes, normalised volume, and rich AudioOutputInfo (type, name, channels, latency).",
+  "unity": "6000.3",
   "author": {
     "name": "Andrew Urbanovich",
     "email": "urbanovichwork@gmail.com"
