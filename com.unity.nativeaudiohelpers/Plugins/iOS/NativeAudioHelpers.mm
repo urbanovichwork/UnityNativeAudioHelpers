@@ -162,29 +162,38 @@ static NAHOutputType NAHClassifyPort(NSString *portType, NSString *portName) {
 
 #pragma mark - Volume setter
 
-// Apple does not provide a public API for changing the system output volume.
-// The supported workaround — used by countless shipping apps — is to keep an
-// MPVolumeView attached to a real window, locate its internal MPVolumeSlider
-// subview, and set its `value`. MPVolumeSlider's setter propagates the change
-// into the audio system and our KVO observer on outputVolume picks up the
-// applied (quantised) value.
+// Apple exposes no public API for setting the system output volume. The
+// workaround used by countless shipping apps is to host an MPVolumeView, reach
+// its private MPVolumeSlider subview, and set `value`; the setter propagates
+// into the audio system and our outputVolume KVO observer reports the applied
+// (quantised) value.
+//
+// An MPVolumeView that lives in the key window's hierarchy SUPPRESSES the system
+// volume HUD (the level overlay shown on hardware-button presses) — an off-screen
+// frame and near-zero alpha do not change that; mere presence is what suppresses
+// it. So we attach only transiently around a set and detach shortly after, which
+// keeps the HUD working for ordinary hardware-button presses (TA-102).
 //
 // Caveats:
 //   • MPVolumeSlider is private API (class-name lookup); Apple could rename it.
-//   • The view must be in a window hierarchy AND laid out before the slider's
-//     value setter takes effect — that's why we attach to the key window.
-//   • alpha 0.001 + off-screen frame keeps the view "logically present" without
-//     disturbing the user-facing UI or suppressing the system volume HUD when
-//     the user uses hardware volume keys.
+//   • The slider's value setter is a no-op until the view is in a window and laid
+//     out, and (iOS 11.4+) only applies when set on a later runloop turn — hence
+//     the deferred commit below.
 
 @interface NAHVolumeSetter : NSObject
 + (instancetype)shared;
 - (void)setVolume:(float)volume;
 @end
 
+// Kept attached just long enough for the value to land, then detached so the
+// system volume HUD returns. Rapid sets (e.g. an in-app slider drag) coalesce and
+// reuse the attached view, so there is no add/remove churn while one is in flight.
+static const NSTimeInterval kNAHVolumeViewDetachDelay = 0.3;
+
 @implementation NAHVolumeSetter {
     MPVolumeView *_volumeView;
     UISlider *_volumeSlider;
+    float _pendingVolume;
 }
 
 + (instancetype)shared {
@@ -204,8 +213,22 @@ static NAHOutputType NAHClassifyPort(NSString *portType, NSString *portName) {
 }
 
 - (void)applyVolume:(float)volume {
+    _pendingVolume = volume;
     if (![self attachIfNeeded]) return;
-    _volumeSlider.value = volume;
+    // Commit on the next runloop turn (the slider must be laid out first), then
+    // detach after a short grace period so the system volume HUD comes back.
+    [NSObject cancelPreviousPerformRequestsWithTarget:self];
+    [self performSelector:@selector(commitPendingVolume) withObject:nil afterDelay:0.0];
+    [self performSelector:@selector(detach) withObject:nil afterDelay:kNAHVolumeViewDetachDelay];
+}
+
+- (void)commitPendingVolume {
+    _volumeSlider.value = _pendingVolume;
+}
+
+- (void)detach {
+    [_volumeView removeFromSuperview];
+    _volumeSlider = nil; // bound to this window; rediscover on the next attach
 }
 
 - (BOOL)attachIfNeeded {
