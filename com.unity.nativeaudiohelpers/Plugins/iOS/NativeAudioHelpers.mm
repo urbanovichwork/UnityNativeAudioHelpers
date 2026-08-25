@@ -51,24 +51,70 @@ static NAHOutputType NAHClassifyPort(NSString *portType, NSString *portName) {
     return NAHOutputTypeUnknown;
 }
 
+// Every getter re-reads AVAudioSession rather than serving the snapshot taken at
+// the last route-change notification. A notification is not a reliable clock for
+// the route: iOS suspends the session while the app is inactive, so a route that
+// changes behind Control Center or Settings — which is exactly how a user pairs
+// AirPods — is either never posted or posted against the suspended session and
+// read back stale. Wired headphones never showed this because plugging them in
+// happens with the app on screen (TA-124).
+// Mirrors Android's AudioHelpers.pickPrimaryOutput: an accessory anywhere in the
+// route outranks whatever happens to be first. `outputs` is an array and iOS
+// documents no ordering for it; the implementation before 2026-05 scanned all of
+// it, and narrowing to firstObject is half of why a connected accessory could
+// report "no headphones" (TA-124). Keep this set in sync with C#
+// AudioOutputInfo.IsHeadphones and Kotlin AudioHelpers.isHeadphoneType.
+static BOOL NAHIsHeadphoneType(NAHOutputType type) {
+    switch (type) {
+        case NAHOutputTypeWiredHeadphones:
+        case NAHOutputTypeWiredHeadset:
+        case NAHOutputTypeUsbHeadset:
+        case NAHOutputTypeBluetoothA2dp:
+        case NAHOutputTypeBluetoothHfp:
+        case NAHOutputTypeBluetoothLe:
+        case NAHOutputTypeHearingAid:
+            return YES;
+        default:
+            return NO;
+    }
+}
+
+static AVAudioSessionPortDescription *NAHPickPrimaryOutput(AVAudioSessionRouteDescription *route) {
+    for (AVAudioSessionPortDescription *out in route.outputs) {
+        if (NAHIsHeadphoneType(NAHClassifyPort(out.portType, out.portName))) return out;
+    }
+    return route.outputs.firstObject;
+}
+
 @interface NAHObserver : NSObject
 + (instancetype)shared;
 - (void)startWithRoute:(NAHRouteChangedCallback)routeCb volume:(NAHVolumeChangedCallback)volumeCb;
 - (void)stop;
 
-@property (atomic, assign, readonly) NAHOutputType outputType;
-@property (atomic, assign, readonly) NSInteger outputChannels;
-@property (atomic, assign, readonly) double outputLatencySeconds;
-// Stable malloc'd UTF-8 buffer, replaced on each refresh.
+- (NAHOutputType)outputType;
+- (NSInteger)outputChannels;
+- (double)outputLatencySeconds;
+// Valid until the next call into this observer; C# marshals it immediately.
 - (const char *)cachedOutputNameUTF8;
 - (float)volume;
 @end
 
+@interface NAHObserver ()
+// Declared up front so the callers above its definition see the BOOL return.
+- (BOOL)refreshRouteCache;
+@end
+
+// All reads and refreshes run on the Unity main thread: the getters are called
+// from C# and both notification handlers hop to the main queue before touching
+// the cache, so the malloc'd name buffer needs no further locking.
 @implementation NAHObserver {
     AVAudioSession *_session;
     NAHRouteChangedCallback _routeCb;
     NAHVolumeChangedCallback _volumeCb;
     BOOL _observing;
+    NAHOutputType _outputType;
+    NSInteger _outputChannels;
+    double _outputLatencySeconds;
     char *_cachedNameUTF8;
 }
 
@@ -103,6 +149,11 @@ static NAHOutputType NAHClassifyPort(NSString *portType, NSString *portName) {
                                              selector:@selector(handleRouteChange:)
                                                  name:AVAudioSessionRouteChangeNotification
                                                object:nil];
+    // The route can change while we are not running; re-read on the way back in.
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(handleDidBecomeActive:)
+                                                 name:UIApplicationDidBecomeActiveNotification
+                                               object:nil];
     _observing = YES;
     [self refreshRouteCache];
 }
@@ -136,26 +187,52 @@ static NAHOutputType NAHClassifyPort(NSString *portType, NSString *portName) {
     });
 }
 
-- (void)refreshRouteCache {
+// Deferred past the synchronous did-become-active observers so the audio plugin
+// has re-activated the session by the time we read the route off it. Only a real
+// change is published: this fires on every foreground, and a spurious event would
+// make every route observer re-run its work for nothing.
+- (void)handleDidBecomeActive:(NSNotification *)note {
+    NAHRouteChangedCallback cb = _routeCb;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if ([self refreshRouteCache] && cb) cb();
+    });
+}
+
+// Returns whether the route this call read differs from the previous one.
+- (BOOL)refreshRouteCache {
     AVAudioSessionRouteDescription *route = _session.currentRoute;
-    AVAudioSessionPortDescription *out = route.outputs.firstObject;
+    AVAudioSessionPortDescription *out = NAHPickPrimaryOutput(route);
 
     NSString *portType = out.portType;
     NSString *portName = out.portName ?: @"";
     NAHOutputType type = (out == nil) ? NAHOutputTypeUnknown : NAHClassifyPort(portType, portName);
 
+    const char *src = portName.UTF8String ?: "";
+    BOOL changed = (type != _outputType) ||
+                   (_cachedNameUTF8 == NULL) ||
+                   (strcmp(_cachedNameUTF8, src) != 0);
+
     _outputType = type;
     _outputChannels = (NSInteger)out.channels.count;
     _outputLatencySeconds = _session.outputLatency;
 
-    const char *src = portName.UTF8String ?: "";
     char *replacement = strdup(src);
     char *previous = _cachedNameUTF8;
     _cachedNameUTF8 = replacement;
     free(previous);
+
+    return changed;
 }
 
-- (const char *)cachedOutputNameUTF8 { return _cachedNameUTF8 ? _cachedNameUTF8 : ""; }
+- (NAHOutputType)outputType { [self refreshRouteCache]; return _outputType; }
+- (NSInteger)outputChannels { [self refreshRouteCache]; return _outputChannels; }
+- (double)outputLatencySeconds { [self refreshRouteCache]; return _outputLatencySeconds; }
+
+- (const char *)cachedOutputNameUTF8 {
+    [self refreshRouteCache];
+    return _cachedNameUTF8 ? _cachedNameUTF8 : "";
+}
+
 - (float)volume { return _session.outputVolume; }
 
 @end
